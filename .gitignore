@@ -1,0 +1,9 @@
+# Mac
+.DS_Store
+
+# Odin
+matching-game.exe
+matching-game.pdb
+matching-game
+matching-game.o
+matching-game.dSYM
