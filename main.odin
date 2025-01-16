@@ -99,18 +99,14 @@ main :: proc() {
 		{ 	// draw board cursor
 			src_rect: SDL.Rect = {0, 0, 32, 32}
 			dest_rect_left: SDL.Rect = {
-				c.int(state.board_cursor.x * CELL_SIZE),
-				c.int(state.board_cursor.y * CELL_SIZE),
+				c.int(state.cursor.left.x * CELL_SIZE),
+				c.int(state.cursor.left.y * CELL_SIZE),
 				c.int(CELL_SIZE),
 				c.int(CELL_SIZE),
 			}
 			dest_rect_right: SDL.Rect = {
-				c.int(
-					state.board_cursor.x == BOARD_WIDTH - 1 \
-					? 0 \
-					: (state.board_cursor.x + 1) * CELL_SIZE,
-				),
-				c.int(state.board_cursor.y * CELL_SIZE),
+				c.int(state.cursor.right.x * CELL_SIZE),
+				c.int(state.cursor.right.y * CELL_SIZE),
 				c.int(CELL_SIZE),
 				c.int(CELL_SIZE),
 			}
@@ -158,19 +154,22 @@ WINDOW_FLAGS :: SDL.WINDOW_SHOWN | SDL.WINDOW_RESIZABLE
 // State
 
 State :: struct {
-	window:       ^SDL.Window,
-	window_w:     i32,
-	window_h:     i32,
-	renderer:     ^SDL.Renderer,
-	font:         ^SDL_TTF.Font,
-	font_size:    i32,
+	window:     ^SDL.Window,
+	window_w:   i32,
+	window_h:   i32,
+	renderer:   ^SDL.Renderer,
+	font:       ^SDL_TTF.Font,
+	font_size:  i32,
 
 	//
-	view:         View,
+	view:       View,
 
 	//
-	game_board:   Board,
-	board_cursor: Point,
+	game_board: Board,
+	cursor:     struct {
+		left:  Point,
+		right: Point,
+	},
 }
 
 Board :: [BOARD_WIDTH * BOARD_HEIGHT]Cell
@@ -216,10 +215,11 @@ View :: enum {
 }
 
 state := State {
-	window_w  = 1024,
-	window_h  = 960,
+	window_w = 1024,
+	window_h = 960,
 	font_size = 28,
-	view      = .GameMatch,
+	view = .GameMatch,
+	cursor = {left = {0, BOARD_HEIGHT - 1}, right = {1, BOARD_HEIGHT - 1}},
 }
 
 
@@ -256,45 +256,47 @@ handle_events :: proc(event: ^SDL.Event) {
 	#partial switch keycode 
 	{
 	case .SPACE:
-		left_index := point_to_index(state.board_cursor)
-		right_index := point_to_index(board_cursor_right(state.board_cursor))
+		left_index := point_to_index(state.cursor.left)
+		right_index := point_to_index(state.cursor.right)
 
 		slice.swap(state.game_board[:], left_index, right_index)
 	case .W:
-		if state.board_cursor.y > 0 {
-			state.board_cursor.y -= 1
-		}
+		cursor_move_by(&state.cursor.left, {0, -1})
+		cursor_move_by(&state.cursor.right, {0, -1})
 	case .A:
-		if state.board_cursor.x == 0 {
-			state.board_cursor.x = BOARD_WIDTH - 1
-		} else {
-			state.board_cursor.x -= 1
-		}
+		cursor_move_by(&state.cursor.left, {-1, 0})
+		cursor_move_by(&state.cursor.right, {-1, 0})
 	case .S:
-		if state.board_cursor.y < BOARD_HEIGHT - 1 {
-			state.board_cursor.y += 1
-		}
+		cursor_move_by(&state.cursor.left, {0, 1})
+		cursor_move_by(&state.cursor.right, {0, 1})
 	case .D:
-		if state.board_cursor.x == BOARD_WIDTH - 1 {
-			state.board_cursor.x = 0
-		} else {
-			state.board_cursor.x += 1
-		}
+		cursor_move_by(&state.cursor.left, {1, 0})
+		cursor_move_by(&state.cursor.right, {1, 0})
 	}
 }
 
 keys_down: map[SDL.Keycode]struct {}
 
-board_cursor_right :: proc(cursor_left: Point) -> Point {
-	cursor_right := cursor_left
+cursor_move_by :: proc(cursor: ^Point, amount: Point) {
+	next_pos := cursor^ + amount
 
-	if cursor_left.x == BOARD_WIDTH - 1 {
-		cursor_right.x = 0
-	} else {
-		cursor_right.x += 1
+	if next_pos.x < 0 {
+		for next_pos.x < 0 {
+			next_pos.x = BOARD_WIDTH + next_pos.x
+		}
+	} else if next_pos.x >= BOARD_WIDTH {
+		for next_pos.x >= BOARD_WIDTH {
+			next_pos.x = next_pos.x - BOARD_WIDTH
+		}
 	}
 
-	return cursor_right
+	if next_pos.y < 0 {
+		next_pos.y = 0
+	} else if next_pos.y >= BOARD_HEIGHT {
+		next_pos.y = BOARD_HEIGHT - 1
+	}
+
+	cursor^ = next_pos
 }
 
 // SDL stuff
