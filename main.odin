@@ -8,6 +8,7 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:log"
 import "core:math"
+import "core:math/linalg"
 import "core:math/rand"
 import "core:mem"
 import "core:slice"
@@ -75,7 +76,7 @@ main :: proc() {
 	}
 
 	os_ctx, _ := renderer.carl(state.grpahics_ctx)
-	state.os_graphqics_ctx = &os_ctx
+	state.os_graphics_ctx = &os_ctx
 
 	SDL.ShowWindow(state.grpahics_ctx.window)
 	game_loop: for {
@@ -107,12 +108,24 @@ main :: proc() {
 			point := index_to_point(idx)
 			color := symbol_to_color(cell.symbol)
 
+			camera := linalg.matrix4_infinite_perspective_f32(
+				fovy = 90,
+				aspect = 16 / 9,
+				near = 0.0,
+			)
+
+			p1 := linalg.matrix_mul_vector(camera, ([4]f32)({-0.5, 0.5, -5, 1}))
+			p2 := linalg.matrix_mul_vector(camera, ([4]f32)({-0.5, -0.5, -5, 1}))
+			p3 := linalg.matrix_mul_vector(camera, ([4]f32)({0.5, -0.5, -5, 1}))
+			p4 := linalg.matrix_mul_vector(camera, ([4]f32)({0.5, 0.5, -5, 1}))
+
+
 			tris[tri_offset] = {
-				points = {{-0.5, 0.48, 0, 1}, {-0.5, -0.5, 0, 1}, {0.48, -0.5, 0, 1}},
+				points = {p1, p2, p3},
 				colors = {color, color, color},
 			}
 			tris[tri_offset + 1] = {
-				points = {{-0.5, 0.48, 0, 1}, {-0.5, -0.5, 0, 1}, {0.48, -0.5, 0, 1}},
+				points = {p1, p3, p4},
 				colors = {color, color, color},
 			}
 			tri_offset += 2
@@ -163,7 +176,7 @@ main :: proc() {
 
 		// renderer.draw_scene(state.grpahics_ctx)
 
-		renderer.barl(state.os_graphqics_ctx, tris[:], {0, 0, 0, 1})
+		renderer.barl(state.os_graphics_ctx, tris[:], {0, 0, 0, 1})
 	}
 
 	delete(keys_down)
@@ -193,15 +206,15 @@ WINDOW_FLAGS :: SDL.WINDOW_SHOWN | SDL.WINDOW_RESIZABLE
 // State
 
 State :: struct {
-	grpahics_ctx:     ^renderer.GraphicsContext,
-	os_graphqics_ctx: ^renderer.OsGrpahicsContext,
+	grpahics_ctx:    ^renderer.GraphicsContext,
+	os_graphics_ctx: ^renderer.OsGrpahicsContext,
 
 	//
-	view:             View,
+	view:            View,
 
 	//
-	game_board:       Board,
-	cursor:           struct {
+	game_board:      Board,
+	cursor:          struct {
 		left:  Point,
 		right: Point,
 	},

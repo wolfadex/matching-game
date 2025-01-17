@@ -8,8 +8,9 @@ import SDL "vendor:sdl2"
 import IMG "vendor:sdl2/image"
 import SDL_TTF "vendor:sdl2/ttf"
 
-Color :: distinct [4]f32
-Point :: distinct [4]f32
+
+Color :: [4]f32
+Point :: [4]f32
 
 Triangle :: struct {
 	points: []Point,
@@ -31,7 +32,7 @@ WINDOW_FLAGS :: SDL.WINDOW_SHOWN | SDL.WINDOW_RESIZABLE
 
 
 init :: proc(width: i32 = 1024, height: i32 = 960, font_size: i32 = 28) -> (ctx: GraphicsContext) {
-	set_env()
+	// set_env()
 
 	ctx.window_w = width
 	ctx.window_h = height
@@ -52,12 +53,6 @@ init :: proc(width: i32 = 1024, height: i32 = 960, font_size: i32 = 28) -> (ctx:
 	)
 	assert(ctx.window != nil, SDL.GetErrorString())
 
-	// Renderer
-	// This is used throughout the program to render everything.
-	// You only require ONE renderer for the entire program.
-	ctx.sdl_renderer = SDL.CreateRenderer(ctx.window, -1, RENDER_FLAGS)
-	assert(ctx.sdl_renderer != nil, SDL.GetErrorString())
-
 	ttf_init_error := SDL_TTF.Init()
 	assert(ttf_init_error != -1, SDL.GetErrorString())
 	ctx.font = SDL_TTF.OpenFont("LiberationMono-Regular.ttf", ctx.font_size)
@@ -66,11 +61,30 @@ init :: proc(width: i32 = 1024, height: i32 = 960, font_size: i32 = 28) -> (ctx:
 	return
 }
 
+vertex_source := `#version 330 core
+layout(location=0) in vec3 a_position;
+layout(location=1) in vec4 a_color;
+out vec4 v_color;
+uniform mat4 u_transform;
+void main() {
+	gl_Position = u_transform * vec4(a_position, 1.0);
+	v_color = a_color;
+}
+`
+
+fragment_source := `#version 330 core
+in vec4 v_color;
+out vec4 o_color;
+void main() {
+	o_color = v_color;
+}
+`
+
 cleanup :: proc(ctx: ^GraphicsContext) {
 	SDL_TTF.Quit()
-	SDL.Quit()
-	SDL.DestroyWindow(ctx.window)
 	SDL.DestroyRenderer(ctx.sdl_renderer)
+	SDL.DestroyWindow(ctx.window)
+	SDL.Quit()
 }
 
 load_texture :: proc(path: string, ctx: ^GraphicsContext) -> ^SDL.Texture {
