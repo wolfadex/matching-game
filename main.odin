@@ -112,13 +112,21 @@ main :: proc() {
 				fovy = 90,
 				aspect = 16 / 9,
 				near = 0.0,
+				// flip_z_axis = false,
 			)
+			// camera *= linalg.matrix4_translate_f32({-32, -32, 0})
 
-			p1 := linalg.matrix_mul_vector(camera, ([4]f32)({-0.5, 0.5, -5, 1}))
-			p2 := linalg.matrix_mul_vector(camera, ([4]f32)({-0.5, -0.5, -5, 1}))
-			p3 := linalg.matrix_mul_vector(camera, ([4]f32)({0.5, -0.5, -5, 1}))
-			p4 := linalg.matrix_mul_vector(camera, ([4]f32)({0.5, 0.5, -5, 1}))
+			x_left := f32(point.x * CELL_SIZE)
+			x_right := x_left + CELL_SIZE
+			y_bottom := f32(point.y * CELL_SIZE)
+			y_top := y_bottom + CELL_SIZE
+			log.debug("cell real", idx, x_left, x_right)
 
+			p1 := linalg.matrix_mul_vector(camera, ([4]f32)({x_left, y_top, -20, 1}))
+			p2 := linalg.matrix_mul_vector(camera, ([4]f32)({x_left, y_bottom, -20, 1}))
+			p3 := linalg.matrix_mul_vector(camera, ([4]f32)({x_right, y_bottom, -20, 1}))
+			p4 := linalg.matrix_mul_vector(camera, ([4]f32)({x_right, y_top, -20, 1}))
+			log.debug("cell scaled", idx, p1.x, p3.x)
 
 			tris[tri_offset] = {
 				points = {p1, p2, p3},
@@ -182,7 +190,7 @@ main :: proc() {
 	delete(keys_down)
 }
 
-CELL_SIZE :: 64
+CELL_SIZE :: 2
 BOARD_WIDTH :: 10
 BOARD_HEIGHT :: 15
 
