@@ -74,6 +74,10 @@ main :: proc() {
 		}
 	}
 
+	os_ctx, _ := renderer.carl(state.grpahics_ctx)
+	state.os_graphqics_ctx = &os_ctx
+
+	SDL.ShowWindow(state.grpahics_ctx.window)
 	game_loop: for {
 		if SDL.PollEvent(&event) {
 			if end_game(&event) do break game_loop
@@ -85,56 +89,84 @@ main :: proc() {
 		NOW = SDL.GetPerformanceCounter()
 		delta_time = f64((NOW - LAST) * 1000 / SDL.GetPerformanceFrequency())
 
+		tris: [BOARD_WIDTH * BOARD_HEIGHT * 2]renderer.Triangle
+		// = {
+		// 	{
+		// 		points = {{-0.5, 0.48, 0, 1}, {-0.5, -0.5, 0, 1}, {0.48, -0.5, 0, 1}},
+		// 		colors = {{1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}},
+		// 	},
+		// 	{
+		// 		points = {{-0.48, 0.5, 0, 1}, {0.5, -0.48, 0, 1}, {0.5, 0.5, 0, 1}},
+		// 		colors = {{1, 0, 0, 1}, {0, 0, 1, 1}, {0, 1, 0, 1}},
+		// 	},
+		// }
+
+		tri_offset: int
+
 		for cell, idx in state.game_board {
 			point := index_to_point(idx)
-			src_rect: SDL.Rect = {32, 0, 32, 32}
-			dest_rect: SDL.Rect = {
-				c.int(point.x * CELL_SIZE),
-				c.int(point.y * CELL_SIZE),
-				c.int(CELL_SIZE),
-				c.int(CELL_SIZE),
-			}
 			color := symbol_to_color(cell.symbol)
-			SDL.SetTextureColorMod(textures_atlas, color.r, color.g, color.b)
-			SDL.RenderCopy(state.grpahics_ctx.sdl_renderer, textures_atlas, &src_rect, &dest_rect)
-		}
-		{ 	// draw board cursor
-			src_rect: SDL.Rect = {0, 0, 32, 32}
-			dest_rect_left: SDL.Rect = {
-				c.int(state.cursor.left.x * CELL_SIZE),
-				c.int(state.cursor.left.y * CELL_SIZE),
-				c.int(CELL_SIZE),
-				c.int(CELL_SIZE),
-			}
-			dest_rect_right: SDL.Rect = {
-				c.int(state.cursor.right.x * CELL_SIZE),
-				c.int(state.cursor.right.y * CELL_SIZE),
-				c.int(CELL_SIZE),
-				c.int(CELL_SIZE),
-			}
-			color := Color{255, 255, 255, 255}
-			SDL.SetTextureColorMod(textures_atlas, color.r, color.g, color.b)
-			SDL.RenderCopy(
-				state.grpahics_ctx.sdl_renderer,
-				textures_atlas,
-				&src_rect,
-				&dest_rect_left,
-			)
-			SDL.RenderCopyEx(
-				state.grpahics_ctx.sdl_renderer,
-				textures_atlas,
-				&src_rect,
-				&dest_rect_right,
-				0,
-				nil,
-				SDL.RendererFlip.HORIZONTAL,
-			)
-		}
 
-		// END update and render
+			tris[tri_offset] = {
+				points = {{-0.5, 0.48, 0, 1}, {-0.5, -0.5, 0, 1}, {0.48, -0.5, 0, 1}},
+				colors = {color, color, color},
+			}
+			tris[tri_offset + 1] = {
+				points = {{-0.5, 0.48, 0, 1}, {-0.5, -0.5, 0, 1}, {0.48, -0.5, 0, 1}},
+				colors = {color, color, color},
+			}
+			tri_offset += 2
+			// src_rect: SDL.Rect = {32, 0, 32, 32}
+			// dest_rect: SDL.Rect = {
+			// 	c.int(point.x * CELL_SIZE),
+			// 	c.int(point.y * CELL_SIZE),
+			// 	c.int(CELL_SIZE),
+			// 	c.int(CELL_SIZE),
+			// }
+			// SDL.SetTextureColorMod(textures_atlas, color.r, color.g, color.b)
+			// SDL.RenderCopy(state.grpahics_ctx.sdl_renderer, textures_atlas, &src_rect, &dest_rect)
+		}
+		// { 	// draw board cursor
+		// 	src_rect: SDL.Rect = {0, 0, 32, 32}
+		// 	dest_rect_left: SDL.Rect = {
+		// 		c.int(state.cursor.left.x * CELL_SIZE),
+		// 		c.int(state.cursor.left.y * CELL_SIZE),
+		// 		c.int(CELL_SIZE),
+		// 		c.int(CELL_SIZE),
+		// 	}
+		// 	dest_rect_right: SDL.Rect = {
+		// 		c.int(state.cursor.right.x * CELL_SIZE),
+		// 		c.int(state.cursor.right.y * CELL_SIZE),
+		// 		c.int(CELL_SIZE),
+		// 		c.int(CELL_SIZE),
+		// 	}
+		// 	color := Color{255, 255, 255, 255}
+		// 	SDL.SetTextureColorMod(textures_atlas, color.r, color.g, color.b)
+		// 	SDL.RenderCopy(
+		// 		state.grpahics_ctx.sdl_renderer,
+		// 		textures_atlas,
+		// 		&src_rect,
+		// 		&dest_rect_left,
+		// 	)
+		// 	SDL.RenderCopyEx(
+		// 		state.grpahics_ctx.sdl_renderer,
+		// 		textures_atlas,
+		// 		&src_rect,
+		// 		&dest_rect_right,
+		// 		0,
+		// 		nil,
+		// 		SDL.RendererFlip.HORIZONTAL,
+		// 	)
+		// }
 
-		renderer.draw_scene(state.grpahics_ctx)
+		// // END update and render
+
+		// renderer.draw_scene(state.grpahics_ctx)
+
+		renderer.barl(state.os_graphqics_ctx, tris[:], {0, 0, 0, 1})
 	}
+
+	delete(keys_down)
 }
 
 CELL_SIZE :: 64
@@ -161,14 +193,15 @@ WINDOW_FLAGS :: SDL.WINDOW_SHOWN | SDL.WINDOW_RESIZABLE
 // State
 
 State :: struct {
-	grpahics_ctx: ^renderer.GraphicsContext,
+	grpahics_ctx:     ^renderer.GraphicsContext,
+	os_graphqics_ctx: ^renderer.OsGrpahicsContext,
 
 	//
-	view:         View,
+	view:             View,
 
 	//
-	game_board:   Board,
-	cursor:       struct {
+	game_board:       Board,
+	cursor:           struct {
 		left:  Point,
 		right: Point,
 	},
@@ -195,18 +228,17 @@ Symbol :: enum {
 	SymbolD,
 }
 
-Color :: distinct [4]u8
 
-symbol_to_color :: proc(symbol: Symbol) -> (color: Color) {
+symbol_to_color :: proc(symbol: Symbol) -> (color: renderer.Color) {
 	switch symbol {
 	case .SymbolA:
-		color = {255, 0, 0, 255}
+		color = {1, 0, 0, 1}
 	case .SymbolB:
-		color = {0, 255, 0, 255}
+		color = {0, 1, 0, 1}
 	case .SymbolC:
-		color = {0, 0, 255, 255}
+		color = {0, 0, 1, 1}
 	case .SymbolD:
-		color = {128, 0, 128, 255}
+		color = {0.5, 0, 0.5, 1}
 	}
 
 	return

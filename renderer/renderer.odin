@@ -1,20 +1,29 @@
 package renderer
 
+import "core:fmt"
+import "core:log"
+import "core:strings"
+
 import SDL "vendor:sdl2"
 import IMG "vendor:sdl2/image"
 import SDL_TTF "vendor:sdl2/ttf"
 
-import "core:log"
-import "core:strings"
-import "core:fmt"
+Color :: distinct [4]f32
+Point :: distinct [4]f32
+
+Triangle :: struct {
+	points: []Point,
+	colors: []Color,
+}
+
 
 GraphicsContext :: struct {
-    window:     ^SDL.Window,
-	window_w:   i32,
-	window_h:   i32,
-	sdl_renderer:   ^SDL.Renderer,
-	font:       ^SDL_TTF.Font,
-	font_size:  i32,
+	window:       ^SDL.Window,
+	window_w:     i32,
+	window_h:     i32,
+	sdl_renderer: ^SDL.Renderer,
+	font:         ^SDL_TTF.Font,
+	font_size:    i32,
 }
 
 RENDER_FLAGS :: SDL.RENDERER_ACCELERATED
@@ -22,13 +31,13 @@ WINDOW_FLAGS :: SDL.WINDOW_SHOWN | SDL.WINDOW_RESIZABLE
 
 
 init :: proc(width: i32 = 1024, height: i32 = 960, font_size: i32 = 28) -> (ctx: GraphicsContext) {
-    set_env()
+	set_env()
 
-    ctx.window_w = width
-   	ctx.window_h = height
-   	ctx.font_size = font_size
+	ctx.window_w = width
+	ctx.window_h = height
+	ctx.font_size = font_size
 
-    // initialize SDL
+	// initialize SDL
 	sdl_init_error := SDL.Init(SDL.INIT_VIDEO)
 	assert(sdl_init_error != -1, SDL.GetErrorString())
 
