@@ -61,8 +61,8 @@ main :: proc() {
 	LAST: u64
 	delta_time: f64
 
-	textures_atlas := renderer.load_texture("./spritesheet.png", state.grpahics_ctx)
-	defer SDL.DestroyTexture(textures_atlas)
+	// textures_atlas := renderer.load_texture("./spritesheet.png", state.grpahics_ctx)
+	// defer SDL.DestroyTexture(textures_atlas)
 
 	for x in 0 ..< BOARD_WIDTH {
 		for y in 0 ..< BOARD_HEIGHT {
@@ -91,16 +91,6 @@ main :: proc() {
 		delta_time = f64((NOW - LAST) * 1000 / SDL.GetPerformanceFrequency())
 
 		tris: [BOARD_WIDTH * BOARD_HEIGHT * 2]renderer.Triangle
-		// = {
-		// 	{
-		// 		points = {{-0.5, 0.48, 0, 1}, {-0.5, -0.5, 0, 1}, {0.48, -0.5, 0, 1}},
-		// 		colors = {{1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}},
-		// 	},
-		// 	{
-		// 		points = {{-0.48, 0.5, 0, 1}, {0.5, -0.48, 0, 1}, {0.5, 0.5, 0, 1}},
-		// 		colors = {{1, 0, 0, 1}, {0, 0, 1, 1}, {0, 1, 0, 1}},
-		// 	},
-		// }
 
 		tri_offset: int
 
@@ -121,35 +111,27 @@ main :: proc() {
 			x_right := x_left + CELL_SIZE
 			y_bottom := f32(point.y * CELL_SIZE)
 			y_top := y_bottom + CELL_SIZE
-			// log.debug("cell real", idx, point, x_left, y_top, x_right, y_bottom)
 
 			p1 := linalg.matrix_mul_vector(camera, ([4]f32)({x_left, y_top, -20, 1})) / 2
 			p2 := linalg.matrix_mul_vector(camera, ([4]f32)({x_left, y_bottom, -20, 1})) / 2
 			p3 := linalg.matrix_mul_vector(camera, ([4]f32)({x_right, y_bottom, -20, 1})) / 2
 			p4 := linalg.matrix_mul_vector(camera, ([4]f32)({x_right, y_top, -20, 1})) / 2
 			log.debug("cell scaled", idx)
-			log.debug("tris 0", tri_offset, tris[tri_offset], tris[0])
+			log.debug("tris 0", tris)
 			tris[tri_offset] = {
 				points = {p1, p2, p3},
 				colors = {color, color, color},
 			}
-			log.debug("tris 1", tri_offset, tris[tri_offset], tris[0])
+			log.debug("tris 1", tris)
 			tris[tri_offset + 1] = {
 				points = {p1, p3, p4},
 				colors = {color, color, color},
 			}
+			log.debug("tris 0", tris)
 
 			tri_offset += 2
-			// src_rect: SDL.Rect = {32, 0, 32, 32}
-			// dest_rect: SDL.Rect = {
-			// 	c.int(point.x * CELL_SIZE),
-			// 	c.int(point.y * CELL_SIZE),
-			// 	c.int(CELL_SIZE),
-			// 	c.int(CELL_SIZE),
-			// }
-			// SDL.SetTextureColorMod(textures_atlas, color.r, color.g, color.b)
-			// SDL.RenderCopy(state.grpahics_ctx.sdl_renderer, textures_atlas, &src_rect, &dest_rect)
 		}
+
 		// { 	// draw board cursor
 		// 	src_rect: SDL.Rect = {0, 0, 32, 32}
 		// 	dest_rect_left: SDL.Rect = {
@@ -188,6 +170,7 @@ main :: proc() {
 		// renderer.draw_scene(state.grpahics_ctx)
 
 		renderer.barl(state.os_graphics_ctx, tris[:], {0, 0, 0, 1})
+		break game_loop
 	}
 
 	delete(keys_down)
