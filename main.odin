@@ -108,26 +108,31 @@ main :: proc() {
 			// camera *= linalg.matrix4_translate_f32({-32, -32, 0})
 
 			x_left := f32(point.x * CELL_SIZE)
-			x_right := x_left + CELL_SIZE
+			x_right: f32 = x_left + CELL_SIZE
 			y_bottom := f32(point.y * CELL_SIZE)
-			y_top := y_bottom + CELL_SIZE
+			y_top: f32 = y_bottom + CELL_SIZE
 
-			p1 := linalg.matrix_mul_vector(camera, ([4]f32)({x_left, y_top, -20, 1})) / 2
-			p2 := linalg.matrix_mul_vector(camera, ([4]f32)({x_left, y_bottom, -20, 1})) / 2
-			p3 := linalg.matrix_mul_vector(camera, ([4]f32)({x_right, y_bottom, -20, 1})) / 2
-			p4 := linalg.matrix_mul_vector(camera, ([4]f32)({x_right, y_top, -20, 1})) / 2
-			log.debug("cell scaled", idx)
-			log.debug("tris 0", tris)
+			p1: renderer.Point = {x_left, y_top, -20, 1}
+			p2: renderer.Point = {x_left, y_bottom, -20, 1}
+			p3: renderer.Point = {x_right, y_bottom, -20, 1}
+			p4: renderer.Point = {x_right, y_top, -20, 1}
+
+			pts: [4]renderer.Point = {p1, p2, p3, p4}
+
+			cam_pts: [4]renderer.Point
+
+			for pt, idx in pts {
+				cam_pts[idx] = linalg.matrix_mul_vector(camera, pt)
+			}
+
 			tris[tri_offset] = {
-				points = {p1, p2, p3},
+				points = {cam_pts[0], cam_pts[1], cam_pts[2]},
 				colors = {color, color, color},
 			}
-			log.debug("tris 1", tris)
 			tris[tri_offset + 1] = {
-				points = {p1, p3, p4},
+				points = {cam_pts[0], cam_pts[2], cam_pts[3]},
 				colors = {color, color, color},
 			}
-			log.debug("tris 0", tris)
 
 			tri_offset += 2
 		}
@@ -170,25 +175,22 @@ main :: proc() {
 		// renderer.draw_scene(state.grpahics_ctx)
 
 		renderer.barl(state.os_graphics_ctx, tris[:], {0, 0, 0, 1})
-		break game_loop
 	}
 
 	delete(keys_down)
 }
 
 CELL_SIZE :: 2
-// BOARD_WIDTH :: 10
-// BOARD_HEIGHT :: 15
-BOARD_WIDTH :: 2
-BOARD_HEIGHT :: 1
+BOARD_WIDTH :: 10
+BOARD_HEIGHT :: 15
 
-Point :: distinct [2]int
+Point2d :: distinct [2]int
 
-point_to_index :: proc(point: Point) -> int {
+point_to_index :: proc(point: Point2d) -> int {
 	return (point.y * BOARD_WIDTH) + point.x
 }
 
-index_to_point :: proc(index: int) -> (point: Point) {
+index_to_point :: proc(index: int) -> (point: Point2d) {
 	point.x = index %% BOARD_WIDTH
 	point.y = index / BOARD_WIDTH
 
@@ -211,8 +213,8 @@ State :: struct {
 	//
 	game_board:      Board,
 	cursor:          struct {
-		left:  Point,
-		right: Point,
+		left:  Point2d,
+		right: Point2d,
 	},
 }
 
@@ -301,14 +303,14 @@ handle_events :: proc(event: ^SDL.Event) {
 
 		slice.swap(state.game_board[:], left_index, right_index)
 	case .W:
-		cursor_move_by(&state.cursor.left, {0, -1})
-		cursor_move_by(&state.cursor.right, {0, -1})
+		cursor_move_by(&state.cursor.left, {0, 1})
+		cursor_move_by(&state.cursor.right, {0, 1})
 	case .A:
 		cursor_move_by(&state.cursor.left, {-1, 0})
 		cursor_move_by(&state.cursor.right, {-1, 0})
 	case .S:
-		cursor_move_by(&state.cursor.left, {0, 1})
-		cursor_move_by(&state.cursor.right, {0, 1})
+		cursor_move_by(&state.cursor.left, {0, -1})
+		cursor_move_by(&state.cursor.right, {0, -1})
 	case .D:
 		cursor_move_by(&state.cursor.left, {1, 0})
 		cursor_move_by(&state.cursor.right, {1, 0})
@@ -317,7 +319,7 @@ handle_events :: proc(event: ^SDL.Event) {
 
 keys_down: map[SDL.Keycode]struct {}
 
-cursor_move_by :: proc(cursor: ^Point, amount: Point) {
+cursor_move_by :: proc(cursor: ^Point2d, amount: Point2d) {
 	next_pos := cursor^ + amount
 
 	if next_pos.x < 0 {

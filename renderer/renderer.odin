@@ -13,8 +13,8 @@ Color :: [4]f32
 Point :: [4]f32
 
 Triangle :: struct {
-	points: []Point,
-	colors: []Color,
+	points: [3]Point,
+	colors: [3]Color,
 }
 
 

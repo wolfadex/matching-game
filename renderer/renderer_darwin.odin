@@ -119,8 +119,12 @@ barl :: proc(
 	defer delete(colors)
 
 	for shape in shapes {
-		append(&positions, ..shape.points)
-		append(&colors, ..shape.colors)
+		append(&positions, shape.points[0])
+		append(&positions, shape.points[1])
+		append(&positions, shape.points[2])
+		append(&colors, shape.colors[0])
+		append(&colors, shape.colors[1])
+		append(&colors, shape.colors[2])
 	}
 
 	position_buffer := os_ctx.device->newBufferWithSlice(positions[:], {})
