@@ -90,6 +90,17 @@ main :: proc() {
 		NOW = SDL.GetPerformanceCounter()
 		delta_time = f64((NOW - LAST) * 1000 / SDL.GetPerformanceFrequency())
 
+		switch rot in state.camera {
+		case f32:
+		case [3]f32:
+			t := rot[2] + f32(delta_time)
+			if t >= 1 {
+				state.camera = rot[1]
+			} else {
+				state.camera = ([3]f32){rot[0], rot[1], t}
+			}
+		}
+
 		tris: [BOARD_WIDTH * BOARD_HEIGHT * 2]renderer.Triangle
 
 		tri_offset: int
@@ -105,7 +116,17 @@ main :: proc() {
 				near = 0.0,
 				// flip_z_axis = false,
 			)
+			camera_rotation: f32
+
+			switch rot in state.camera {
+			case f32:
+				camera_rotation = rot
+			case [3]f32:
+				camera_rotation = linalg.lerp(rot[0], rot[1], rot[2])
+			}
+
 			camera *= linalg.matrix4_translate_f32({0, -15, -20})
+			camera *= linalg.matrix4_rotate_f32(linalg.to_radians(camera_rotation), {0, 1, 0})
 
 			// x_left := f32(point.x * CELL_SIZE)
 			// x_right := x_left + CELL_SIZE
@@ -188,6 +209,7 @@ main :: proc() {
 CELL_SIZE :: 2
 BOARD_WIDTH :: 10
 BOARD_HEIGHT :: 15
+ROTATION_DEG :: f32(360 / BOARD_WIDTH)
 
 Point2d :: distinct [2]int
 
@@ -221,7 +243,12 @@ State :: struct {
 		left:  Point2d,
 		right: Point2d,
 	},
+	camera:          union #no_nil {
+		f32,
+		[3]f32,
+	},
 }
+
 
 Board :: [BOARD_WIDTH * BOARD_HEIGHT]Cell
 
@@ -266,7 +293,8 @@ View :: enum {
 
 state := State {
 	view = .GameMatch,
-	cursor = {left = {0, BOARD_HEIGHT - 1}, right = {1, BOARD_HEIGHT - 1}},
+	cursor = {left = {0, 0}, right = {1, 0}},
+	camera = ROTATION_DEG / 2,
 }
 
 
@@ -311,14 +339,28 @@ handle_events :: proc(event: ^SDL.Event) {
 		cursor_move_by(&state.cursor.left, {0, 1})
 		cursor_move_by(&state.cursor.right, {0, 1})
 	case .A:
-		cursor_move_by(&state.cursor.left, {-1, 0})
-		cursor_move_by(&state.cursor.right, {-1, 0})
+		cursor_move_by(&state.cursor.left, {1, 0})
+		cursor_move_by(&state.cursor.right, {1, 0})
+
+		switch rot in state.camera {
+		case f32:
+			state.camera = ([3]f32){rot, rot + ROTATION_DEG, 0}
+		case [3]f32:
+			state.camera = ([3]f32){rot[0], rot[1] + ROTATION_DEG, rot[2]}
+		}
 	case .S:
 		cursor_move_by(&state.cursor.left, {0, -1})
 		cursor_move_by(&state.cursor.right, {0, -1})
 	case .D:
-		cursor_move_by(&state.cursor.left, {1, 0})
-		cursor_move_by(&state.cursor.right, {1, 0})
+		cursor_move_by(&state.cursor.left, {-1, 0})
+		cursor_move_by(&state.cursor.right, {-1, 0})
+
+		switch rot in state.camera {
+		case f32:
+			state.camera = ([3]f32){rot, rot - ROTATION_DEG, 0}
+		case [3]f32:
+			state.camera = ([3]f32){rot[0], rot[1] - ROTATION_DEG, rot[2]}
+		}
 	}
 }
 
