@@ -1,6 +1,7 @@
 package renderer
 
 import "core:fmt"
+import "core:log"
 import "core:math"
 
 import NS "core:sys/darwin/Foundation"
@@ -152,38 +153,10 @@ barl :: proc(
 	render_encoder->setRenderPipelineState(os_ctx.pipeline_state)
 	render_encoder->setVertexBuffer(position_buffer, 0, 0)
 	render_encoder->setVertexBuffer(color_buffer, 0, 1)
-	render_encoder->drawPrimitives(.Triangle, 0, 6)
+	render_encoder->drawPrimitives(.Triangle, 0, NS.UInteger(len(positions)))
 
 	render_encoder->endEncoding()
 
 	command_buffer->presentDrawable(drawable)
 	command_buffer->commit()
 }
-
-// https://z4gon.github.io/blog/metal-render-pipeline-part-11-3d-perspective-projection-matrix
-project_perspective :: proc(
-	point: [4][4]f64,
-	fieldOfView: f64,
-	aspectRatio: f64,
-	farClippingDistance: f64,
-	nearClippingDistance: f64,
-) -> [4][4]f64 {
-
-	pers: [4][4]f64 = {
-		{1 / (aspectRatio * math.tan(fieldOfView / 2)), 0, 0, 0},
-		{0, 2 / math.tan(fieldOfView / 2), 0, 0},
-		{
-			0,
-			0,
-			-((farClippingDistance + nearClippingDistance) /
-				(farClippingDistance - nearClippingDistance)),
-			-((2 * farClippingDistance * nearClippingDistance) /
-				(farClippingDistance - nearClippingDistance)),
-		},
-		{0, 0, -1, 0},
-	}
-
-	return point * pers
-}
-
-identity_matrix: [4][4]f64 : {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}

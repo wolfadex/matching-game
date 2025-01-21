@@ -110,7 +110,8 @@ main :: proc() {
 
 			camera := linalg.matrix4_infinite_perspective_f32(
 				fovy = 90,
-				aspect = 16 / 9,
+				// aspect = 16 / 9,
+				aspect = f32(state.grpahics_ctx.window_w / state.grpahics_ctx.window_h),
 				near = 0.0,
 				// flip_z_axis = false,
 			)
@@ -120,22 +121,24 @@ main :: proc() {
 			x_right := x_left + CELL_SIZE
 			y_bottom := f32(point.y * CELL_SIZE)
 			y_top := y_bottom + CELL_SIZE
-			log.debug("cell real", idx, x_left, x_right)
+			// log.debug("cell real", idx, point, x_left, y_top, x_right, y_bottom)
 
-			p1 := linalg.matrix_mul_vector(camera, ([4]f32)({x_left, y_top, -20, 1}))
-			p2 := linalg.matrix_mul_vector(camera, ([4]f32)({x_left, y_bottom, -20, 1}))
-			p3 := linalg.matrix_mul_vector(camera, ([4]f32)({x_right, y_bottom, -20, 1}))
-			p4 := linalg.matrix_mul_vector(camera, ([4]f32)({x_right, y_top, -20, 1}))
-			log.debug("cell scaled", idx, p1.x, p3.x)
-
+			p1 := linalg.matrix_mul_vector(camera, ([4]f32)({x_left, y_top, -20, 1})) / 2
+			p2 := linalg.matrix_mul_vector(camera, ([4]f32)({x_left, y_bottom, -20, 1})) / 2
+			p3 := linalg.matrix_mul_vector(camera, ([4]f32)({x_right, y_bottom, -20, 1})) / 2
+			p4 := linalg.matrix_mul_vector(camera, ([4]f32)({x_right, y_top, -20, 1})) / 2
+			log.debug("cell scaled", idx)
+			log.debug("tris 0", tri_offset, tris[tri_offset], tris[0])
 			tris[tri_offset] = {
 				points = {p1, p2, p3},
 				colors = {color, color, color},
 			}
+			log.debug("tris 1", tri_offset, tris[tri_offset], tris[0])
 			tris[tri_offset + 1] = {
 				points = {p1, p3, p4},
 				colors = {color, color, color},
 			}
+
 			tri_offset += 2
 			// src_rect: SDL.Rect = {32, 0, 32, 32}
 			// dest_rect: SDL.Rect = {
@@ -191,8 +194,10 @@ main :: proc() {
 }
 
 CELL_SIZE :: 2
-BOARD_WIDTH :: 10
-BOARD_HEIGHT :: 15
+// BOARD_WIDTH :: 10
+// BOARD_HEIGHT :: 15
+BOARD_WIDTH :: 2
+BOARD_HEIGHT :: 1
 
 Point :: distinct [2]int
 
