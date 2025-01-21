@@ -105,17 +105,19 @@ main :: proc() {
 				near = 0.0,
 				// flip_z_axis = false,
 			)
-			camera *= linalg.matrix4_translate_f32({-8, -15, -20})
+			camera *= linalg.matrix4_translate_f32({0, -15, -20})
 
-			x_left := f32(point.x * CELL_SIZE)
-			x_right: f32 = x_left + CELL_SIZE
+			// x_left := f32(point.x * CELL_SIZE)
+			// x_right := x_left + CELL_SIZE
+			x_left: f32 = CELL_SIZE / -2
+			x_right: f32 = CELL_SIZE / 2
 			y_bottom := f32(point.y * CELL_SIZE)
-			y_top: f32 = y_bottom + CELL_SIZE
+			y_top := y_bottom + CELL_SIZE
 
-			p1: renderer.Point = {x_left, y_top, 0, 1}
-			p2: renderer.Point = {x_left, y_bottom, 0, 1}
-			p3: renderer.Point = {x_right, y_bottom, 0, 1}
-			p4: renderer.Point = {x_right, y_top, 0, 1}
+			p1: renderer.Point = {x_left, y_top, 5, 1}
+			p2: renderer.Point = {x_left, y_bottom, 5, 1}
+			p3: renderer.Point = {x_right, y_bottom, 5, 1}
+			p4: renderer.Point = {x_right, y_top, 5, 1}
 
 			pts: [4]renderer.Point = {p1, p2, p3, p4}
 
@@ -123,9 +125,8 @@ main :: proc() {
 
 			// apply camera
 			for pt, idx in pts {
-				// rot_deg := f32(point.x * (360 / BOARD_WIDTH))
-				// log.debug("rot", point.x, rot_deg)
-				p := pt //* linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
+				rot_deg := f32(point.x * (360 / BOARD_WIDTH))
+				p := pt * linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
 				cam_pts[idx] = linalg.matrix_mul_vector(camera, p)
 			}
 
