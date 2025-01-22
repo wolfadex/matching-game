@@ -93,7 +93,6 @@ main :: proc() {
 
 		switch rot in state.camera {
 		case f32:
-			state.camera = rot - f32(delta_time) / 100
 		case [3]f32:
 			t := rot[2] + f32(delta_time)
 			if t >= 1 {
@@ -104,65 +103,101 @@ main :: proc() {
 		}
 
 		tris: [BOARD_WIDTH * BOARD_HEIGHT * 2]renderer.Triangle
-
 		tri_offset: int
+
+		camera := linalg.matrix4_infinite_perspective_f32(
+			fovy = 90,
+			// aspect = 16 / 9,
+			aspect = f32(state.grpahics_ctx.window_w / state.grpahics_ctx.window_h),
+			near = 0.0,
+			// flip_z_axis = false,
+		)
+		camera_rotation: f32
+
+		switch rot in state.camera {
+		case f32:
+			camera_rotation = rot
+		case [3]f32:
+			camera_rotation = linalg.lerp(rot[0], rot[1], rot[2])
+		}
+
+		camera *= linalg.matrix4_translate_f32({0, -15, -20})
+		camera *= linalg.matrix4_rotate_f32(linalg.to_radians(camera_rotation), {0, 1, 0})
+
+		make_quad :: proc(
+			tris: []renderer.Triangle,
+			x_offset: int,
+			tris_offset: int,
+			corners: [4]renderer.Point,
+			color: renderer.Color,
+			camera: linalg.Matrix4f32,
+		) {
+			cam_pts: [4]renderer.Point
+
+			// apply camera
+			for pt, idx in corners {
+				rot_deg := f32(x_offset * (360 / BOARD_WIDTH))
+				p := pt * linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
+				cam_pts[idx] = linalg.matrix_mul_vector(camera, p)
+			}
+			tris[tris_offset] = {
+				points = {cam_pts[0], cam_pts[1], cam_pts[2]},
+				colors = {color, color, color},
+			}
+			tris[tris_offset + 1] = {
+				points = {cam_pts[0], cam_pts[2], cam_pts[3]},
+				colors = {color, color, color},
+			}
+		}
 
 		for cell, idx in state.game_board {
 			point := index_to_point(idx)
 			color := symbol_to_color(cell.symbol)
 
-			camera := linalg.matrix4_infinite_perspective_f32(
-				fovy = 90,
-				// aspect = 16 / 9,
-				aspect = f32(state.grpahics_ctx.window_w / state.grpahics_ctx.window_h),
-				near = 0.0,
-				// flip_z_axis = false,
-			)
-			camera_rotation: f32
-
-			switch rot in state.camera {
-			case f32:
-				camera_rotation = rot
-			case [3]f32:
-				camera_rotation = linalg.lerp(rot[0], rot[1], rot[2])
-			}
-
-			camera *= linalg.matrix4_translate_f32({0, -15, -20})
-			camera *= linalg.matrix4_rotate_f32(linalg.to_radians(camera_rotation), {0, 1, 0})
-
-			// x_left := f32(point.x * CELL_SIZE)
-			// x_right := x_left + CELL_SIZE
 			x_left: f32 = CELL_SIZE / -2
 			x_right: f32 = CELL_SIZE / 2
 			y_bottom := f32(point.y * CELL_SIZE)
 			y_top := y_bottom + CELL_SIZE
 
-			p1: renderer.Point = {x_left, y_top, 5, 1}
-			p2: renderer.Point = {x_left, y_bottom, 5, 1}
-			p3: renderer.Point = {x_right, y_bottom, 5, 1}
-			p4: renderer.Point = {x_right, y_top, 5, 1}
+			p1: renderer.Point = {x_left, y_top, RADIUS, 1}
+			p2: renderer.Point = {x_left, y_bottom, RADIUS, 1}
+			p3: renderer.Point = {x_right, y_bottom, RADIUS, 1}
+			p4: renderer.Point = {x_right, y_top, RADIUS, 1}
 
-			pts: [4]renderer.Point = {p1, p2, p3, p4}
-
-			cam_pts: [4]renderer.Point
-
-			// apply camera
-			for pt, idx in pts {
-				rot_deg := f32(point.x * (360 / BOARD_WIDTH))
-				p := pt * linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
-				cam_pts[idx] = linalg.matrix_mul_vector(camera, p)
-			}
-
-			tris[tri_offset] = {
-				points = {cam_pts[0], cam_pts[1], cam_pts[2]},
-				colors = {color, color, color},
-			}
-			tris[tri_offset + 1] = {
-				points = {cam_pts[0], cam_pts[2], cam_pts[3]},
-				colors = {color, color, color},
-			}
+			make_quad(tris[:], point.x, tri_offset, {p1, p2, p3, p4}, color, camera)
 
 			tri_offset += 2
+		}
+		{ 	// DRAW CURSOR
+			// x_left: f32 = CELL_SIZE / -2
+			// x_right: f32 = CELL_SIZE / 2
+			// y_bottom := f32(state.cursor.left.y * CELL_SIZE)
+			// y_top := y_bottom + CELL_SIZE
+
+			// p1: renderer.Point = {x_left, y_top, RADIUS, 1}
+			// p2: renderer.Point = {x_left, y_bottom, RADIUS, 1}
+			// p3: renderer.Point = {x_right, y_bottom, RADIUS, 1}
+			// p4: renderer.Point = {x_right, y_top, RADIUS, 1}
+
+			// pts: [4]renderer.Point = {p1, p2, p3, p4}
+
+			// cam_pts: [4]renderer.Point
+
+			// // apply camera
+			// for pt, idx in pts {
+			// 	rot_deg := f32(point.x * (360 / BOARD_WIDTH))
+			// 	p := pt * linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
+			// 	cam_pts[idx] = linalg.matrix_mul_vector(camera, p)
+			// }
+
+			// tris[tri_offset] = {
+			// 	points = {cam_pts[0], cam_pts[1], cam_pts[2]},
+			// 	colors = {color, color, color},
+			// }
+			// tris[tri_offset + 1] = {
+			// 	points = {cam_pts[0], cam_pts[2], cam_pts[3]},
+			// 	colors = {color, color, color},
+			// }
 		}
 
 		// { 	// draw board cursor
@@ -209,8 +244,9 @@ main :: proc() {
 }
 
 CELL_SIZE :: 2
-BOARD_WIDTH :: 10
+BOARD_WIDTH :: 20
 BOARD_HEIGHT :: 15
+RADIUS :: 8
 ROTATION_DEG :: f32(360 / BOARD_WIDTH)
 
 Point2d :: distinct [2]int
