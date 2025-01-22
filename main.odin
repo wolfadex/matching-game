@@ -95,7 +95,7 @@ main :: proc() {
 		case f32:
 		case [3]f32:
 			t := rot[2] + f32(delta_time)
-			if t >= 1 {
+			if t >= ROTATION_TIME {
 				state.camera = rot[1]
 			} else {
 				state.camera = ([3]f32){rot[0], rot[1], t}
@@ -110,7 +110,6 @@ main :: proc() {
 			// aspect = 16 / 9,
 			aspect = f32(state.grpahics_ctx.window_w / state.grpahics_ctx.window_h),
 			near = 0.0,
-			// flip_z_axis = false,
 		)
 		camera_rotation: f32
 
@@ -118,7 +117,7 @@ main :: proc() {
 		case f32:
 			camera_rotation = rot
 		case [3]f32:
-			camera_rotation = linalg.lerp(rot[0], rot[1], rot[2])
+			camera_rotation = linalg.lerp(rot[0], rot[1], rot[2] / ROTATION_TIME)
 		}
 
 		camera *= linalg.matrix4_translate_f32({0, -15, -20})
@@ -248,6 +247,7 @@ BOARD_WIDTH :: 20
 BOARD_HEIGHT :: 15
 RADIUS :: 8
 ROTATION_DEG :: f32(360 / BOARD_WIDTH)
+ROTATION_TIME :: 50 // ms
 
 Point2d :: distinct [2]int
 
