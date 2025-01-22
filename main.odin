@@ -75,8 +75,9 @@ main :: proc() {
 		}
 	}
 
-	os_ctx, _ := renderer.carl(state.grpahics_ctx)
+	os_ctx, _ := renderer.os_init(state.grpahics_ctx)
 	state.os_graphics_ctx = &os_ctx
+	defer renderer.os_cleanup(state.os_graphics_ctx)
 
 	SDL.ShowWindow(state.grpahics_ctx.window)
 	game_loop: for {
@@ -92,6 +93,7 @@ main :: proc() {
 
 		switch rot in state.camera {
 		case f32:
+			state.camera = rot - f32(delta_time) / 100
 		case [3]f32:
 			t := rot[2] + f32(delta_time)
 			if t >= 1 {
@@ -200,7 +202,7 @@ main :: proc() {
 
 		// renderer.draw_scene(state.grpahics_ctx)
 
-		renderer.barl(state.os_graphics_ctx, tris[:], {0, 0, 0, 1})
+		renderer.render(state.grpahics_ctx, state.os_graphics_ctx, tris[:], {0, 0, 0, 1})
 	}
 
 	delete(keys_down)
