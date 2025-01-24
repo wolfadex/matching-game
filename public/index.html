@@ -6,7 +6,13 @@
     <body>
         <script src="elm.js"></script>
         <script>
-            Elm.Main.init({ flags: Date.now() });
+            Elm.Main.init({
+                flags: {
+                    seedStarter: Date.now(),
+                    windowWidth: window.screen.width,
+                    windowHeight: window.screen.height,
+                },
+            });
         </script>
     </body>
 </html>

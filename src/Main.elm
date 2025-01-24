@@ -12,6 +12,8 @@ import Camera3d
 import Color exposing (Color)
 import Direction3d
 import Frame3d exposing (Frame3d)
+import Html
+import Html.Attributes
 import Json.Decode
 import Length
 import Pixels
@@ -26,7 +28,7 @@ import Vector3d
 import Viewpoint3d
 
 
-main : Program Int Model Msg
+main : Program { seedStarter : Int, windowWidth : Int, windowHeight : Int } Model Msg
 main =
     Browser.document
         { init = init
@@ -41,6 +43,8 @@ type alias Model =
     , board : Board
     , cursor : Cursor
     , rotation : ( Angle, Animation Angle )
+    , windowWidth : Int
+    , windowHeight : Int
     }
 
 
@@ -61,7 +65,7 @@ boardWidth =
 
 boardHeight =
     -- rows
-    15
+    10
 
 
 rotationDeg =
@@ -153,8 +157,8 @@ radius =
         / sin (degrees theta)
 
 
-init : Int -> ( Model, Cmd Msg )
-init seedStarter =
+init : { seedStarter : Int, windowWidth : Int, windowHeight : Int } -> ( Model, Cmd Msg )
+init { seedStarter, windowWidth, windowHeight } =
     let
         ( initialBoard, seed ) =
             Random.step
@@ -185,6 +189,8 @@ init seedStarter =
       , board = changeFocus { old = cursor, new = cursor } initialBoard
       , cursor = cursor
       , rotation = ( Angle.degrees (rotationDeg / 2), Animation.animation [] )
+      , windowWidth = windowWidth
+      , windowHeight = windowHeight
       }
     , Cmd.none
     )
@@ -193,6 +199,7 @@ init seedStarter =
 type Msg
     = UserInput Input
     | Tick Float
+    | WindowResized Int Int
 
 
 type Input
@@ -208,6 +215,7 @@ subscriptions _ =
     Sub.batch
         [ Browser.Events.onKeyDown keyDownDecoder
         , Browser.Events.onAnimationFrameDelta Tick
+        , Browser.Events.onResize WindowResized
         ]
 
 
@@ -240,6 +248,11 @@ keyDownDecoder =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        WindowResized width height ->
+            ( { model | windowWidth = width, windowHeight = height }
+            , Cmd.none
+            )
+
         Tick deltaMs ->
             ( { model
                 | board =
@@ -521,60 +534,66 @@ view : Model -> Browser.Document Msg
 view model =
     { title = "Matching Game"
     , body =
-        [ let
-            -- Create a single rectangle from its color and four vertices
-            -- (Scene3d.quad can be used to create any flat four-sided shape)
-            square =
-                Scene3d.quad (Scene3d.Material.color Color.blue)
-                    (Point3d.meters -1 -1 0)
-                    (Point3d.meters 1 -1 0)
-                    (Point3d.meters 1 1 0)
-                    (Point3d.meters -1 1 0)
+        [ Html.div
+            [ Html.Attributes.style "border" "1px solid black"
+            ]
+            [ let
+                camera =
+                    Camera3d.perspective
+                        { viewpoint =
+                            Viewpoint3d.orbitZ
+                                { focalPoint = Point3d.meters 0 0 6
+                                , azimuth = Angle.degrees 90
+                                , elevation = Angle.degrees 5
+                                , distance = Length.meters 30
+                                }
+                        , verticalFieldOfView = Angle.degrees 30
+                        }
 
-            -- Define our camera
-            camera =
-                Camera3d.perspective
-                    { viewpoint =
-                        Viewpoint3d.orbitZ
-                            { focalPoint = Point3d.meters 0 0 6
-                            , azimuth = Angle.degrees 90
-                            , elevation = Angle.degrees 5
-                            , distance = Length.meters 30
-                            }
-                    , verticalFieldOfView = Angle.degrees 30
-                    }
+                ( defaultRot, rotationAnim ) =
+                    model.rotation
 
-            ( defaultRot, rotationAnim ) =
-                model.rotation
+                ( rotation, _ ) =
+                    Animation.animate
+                        defaultRot
+                        Quantity.interpolateFrom
+                        0
+                        rotationAnim
+              in
+              Scene3d.sunny
+                { entities =
+                    model.board
+                        |> Array.toList
+                        |> List.indexedMap (viewCell rotation model.cursor)
+                        |> List.concat
+                , sunlightDirection =
+                    Direction3d.xyZ
+                        (Angle.degrees -90)
+                        (Angle.degrees 45)
+                , shadows = True
+                , upDirection = Direction3d.positiveZ
+                , camera = camera
+                , clipDepth = Length.millimeters 1
+                , background = Scene3d.transparentBackground
+                , dimensions =
+                    let
+                        desiredWidth =
+                            round (toFloat model.windowHeight * 16 / 9)
 
-            ( rotation, _ ) =
-                Animation.animate
-                    defaultRot
-                    Quantity.interpolateFrom
-                    0
-                    rotationAnim
-          in
-          -- Render a scene that doesn't involve any lighting (no lighting is needed
-          -- here since we provided a material that will result in a constant color
-          -- no matter what lighting is used)
-          Scene3d.sunny
-            { -- Our scene has a single 'entity' in it
-              entities =
-                model.board
-                    |> Array.toList
-                    |> List.indexedMap (viewCell rotation model.cursor)
-                    |> List.concat
-            , sunlightDirection =
-                Direction3d.xyZ
-                    (Angle.degrees -90)
-                    (Angle.degrees 45)
-            , shadows = True
-            , upDirection = Direction3d.positiveZ
-            , camera = camera
-            , clipDepth = Length.millimeters 1
-            , background = Scene3d.transparentBackground
-            , dimensions = ( Pixels.int 800, Pixels.int 600 )
-            }
+                        desiredHeight =
+                            round (toFloat model.windowWidth * 9 / 16)
+                    in
+                    if desiredHeight > model.windowHeight then
+                        ( Pixels.int desiredWidth
+                        , Pixels.int model.windowHeight
+                        )
+
+                    else
+                        ( Pixels.int model.windowWidth
+                        , Pixels.int desiredHeight
+                        )
+                }
+            ]
         ]
     }
 
