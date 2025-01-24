@@ -51,8 +51,8 @@ main :: proc() {
 	}
 
 	ctx := renderer.init()
-	state.grpahics_ctx = &ctx
-	defer renderer.cleanup(state.grpahics_ctx)
+	state.graphics_ctx = &ctx
+	defer renderer.cleanup(state.graphics_ctx)
 
 	// poll for queued events each game loop
 	event: SDL.Event
@@ -61,7 +61,7 @@ main :: proc() {
 	LAST: u64
 	delta_time: f64
 
-	// textures_atlas := renderer.load_texture("./spritesheet.png", state.grpahics_ctx)
+	// textures_atlas := renderer.load_texture("./spritesheet.png", state.graphics_ctx)
 	// defer SDL.DestroyTexture(textures_atlas)
 
 	for x in 0 ..< BOARD_WIDTH {
@@ -75,11 +75,11 @@ main :: proc() {
 		}
 	}
 
-	os_ctx, _ := renderer.os_init(state.grpahics_ctx)
+	os_ctx, _ := renderer.os_init(state.graphics_ctx)
 	state.os_graphics_ctx = &os_ctx
 	defer renderer.os_cleanup(state.os_graphics_ctx)
 
-	SDL.ShowWindow(state.grpahics_ctx.window)
+	SDL.ShowWindow(state.graphics_ctx.window)
 	game_loop: for {
 		if SDL.PollEvent(&event) {
 			if end_game(&event) do break game_loop
@@ -102,13 +102,14 @@ main :: proc() {
 			}
 		}
 
-		tris: [BOARD_WIDTH * BOARD_HEIGHT * 2]renderer.Triangle
+		// tiles + cursor
+		tris: [BOARD_WIDTH * BOARD_HEIGHT * 2 + 8]renderer.Triangle
 		tri_offset: int
 
 		camera := linalg.matrix4_infinite_perspective_f32(
 			fovy = 90,
 			// aspect = 16 / 9,
-			aspect = f32(state.grpahics_ctx.window_w / state.grpahics_ctx.window_h),
+			aspect = f32(state.graphics_ctx.window_w / state.graphics_ctx.window_h),
 			near = 0.0,
 		)
 		camera_rotation: f32
@@ -131,13 +132,18 @@ main :: proc() {
 			color: renderer.Color,
 			camera: linalg.Matrix4f32,
 		) {
+			//        +------+
+			//       /|     /|
+			//   p0 +-+----+ | p3
+			//      | |    | |
+			//      | +----+-+
+			//      |/     |/
+			//   p1 +------+ p2
 			cam_pts: [4]renderer.Point
 
 			// apply camera
 			for pt, idx in corners {
-				rot_deg := f32(x_offset * (360 / BOARD_WIDTH))
-				p := pt * linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
-				cam_pts[idx] = linalg.matrix_mul_vector(camera, p)
+				cam_pts[idx] = linalg.matrix_mul_vector(camera, pt)
 			}
 			tris[tris_offset] = {
 				points = {cam_pts[0], cam_pts[1], cam_pts[2]},
@@ -149,6 +155,7 @@ main :: proc() {
 			}
 		}
 
+		// DRAW CELLS
 		for cell, idx in state.game_board {
 			point := index_to_point(idx)
 			color := symbol_to_color(cell.symbol)
@@ -163,40 +170,94 @@ main :: proc() {
 			p3: renderer.Point = {x_right, y_bottom, RADIUS, 1}
 			p4: renderer.Point = {x_right, y_top, RADIUS, 1}
 
-			make_quad(tris[:], point.x, tri_offset, {p1, p2, p3, p4}, color, camera)
+			corners: [4]renderer.Point = {p1, p2, p3, p4}
+
+			rot_deg := f32(point.x * (360 / BOARD_WIDTH))
+			for pt, idx in corners {
+				corners[idx] =
+					pt * linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
+			}
+
+			make_quad(tris[:], point.x, tri_offset, corners, color, camera)
 
 			tri_offset += 2
 		}
+
 		{ 	// DRAW CURSOR
-			// x_left: f32 = CELL_SIZE / -2
-			// x_right: f32 = CELL_SIZE / 2
-			// y_bottom := f32(state.cursor.left.y * CELL_SIZE)
-			// y_top := y_bottom + CELL_SIZE
+			x_left: f32 = CELL_SIZE / -2 - CELL_SIZE
+			x_right: f32 = CELL_SIZE / 2
+			y_bottom_right := f32(state.cursor.left.y * CELL_SIZE)
+			y_top_right := y_bottom_right + CELL_SIZE
+			y_bottom_left := f32(state.cursor.right.y * CELL_SIZE)
+			y_top_left := y_bottom_left + CELL_SIZE
 
-			// p1: renderer.Point = {x_left, y_top, RADIUS, 1}
-			// p2: renderer.Point = {x_left, y_bottom, RADIUS, 1}
-			// p3: renderer.Point = {x_right, y_bottom, RADIUS, 1}
-			// p4: renderer.Point = {x_right, y_top, RADIUS, 1}
+			//   ulo +------------------------+ uro
+			//       | uli +------------+ uri |
+			//       |     |            |     |
+			//       | lli +------------+ lri |
+			//   llo +------------------------+ lro
+			//
+			// quads:
+			//   ulo,uli,uri,uro - upper portion
+			//   ulo,llo,lli,uli - left portion
+			//   lli,llo,lro,lri - lower portion
+			//   uri,lri,lro,uro - right portion
 
-			// pts: [4]renderer.Point = {p1, p2, p3, p4}
+			outer_offset: f32 = 0.2
+			rot_left_deg := f32(state.cursor.left.x * (360 / BOARD_WIDTH))
+			rot_left_mat := linalg.matrix4_rotate_f32(linalg.to_radians(rot_left_deg), {0, 1, 0})
+			rot_right_deg := f32(state.cursor.right.x * (360 / BOARD_WIDTH))
+			rot_right_mat := linalg.matrix4_rotate_f32(linalg.to_radians(rot_right_deg), {0, 1, 0})
 
-			// cam_pts: [4]renderer.Point
+			upper_left_inner: renderer.Point = {x_left, y_top_left, RADIUS, 1}
+			upper_left_outer: renderer.Point =
+				upper_left_inner + {-outer_offset, outer_offset, 0, 0}
+			lower_left_inner: renderer.Point = {x_left, y_bottom_left, RADIUS, 1}
+			lower_left_outer: renderer.Point =
+				lower_left_inner + {-outer_offset, -outer_offset, 0, 0}
+			lower_right_inner: renderer.Point = {x_right, y_bottom_right, RADIUS, 1}
+			lower_right_outer: renderer.Point =
+				lower_right_inner + {outer_offset, -outer_offset, 0, 0}
+			upper_right_inner: renderer.Point = {x_right, y_top_right, RADIUS, 1}
+			upper_right_outer: renderer.Point =
+				upper_right_inner + {outer_offset, outer_offset, 0, 0}
 
-			// // apply camera
-			// for pt, idx in pts {
-			// 	rot_deg := f32(point.x * (360 / BOARD_WIDTH))
-			// 	p := pt * linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
-			// 	cam_pts[idx] = linalg.matrix_mul_vector(camera, p)
-			// }
+			// upper_left_inner *= rot_left_mat
+			// lower_left_inner *= rot_left_mat
+			// upper_right_inner *= rot_left_mat
+			// lower_right_inner *= rot_left_mat
 
-			// tris[tri_offset] = {
-			// 	points = {cam_pts[0], cam_pts[1], cam_pts[2]},
-			// 	colors = {color, color, color},
-			// }
-			// tris[tri_offset + 1] = {
-			// 	points = {cam_pts[0], cam_pts[2], cam_pts[3]},
-			// 	colors = {color, color, color},
-			// }
+			white: renderer.Color = {1, 1, 1, 1}
+
+			upper: [4]renderer.Point = {
+				upper_left_outer,
+				upper_left_inner,
+				upper_right_inner,
+				upper_right_outer,
+			}
+			left: [4]renderer.Point = {
+				upper_left_outer,
+				lower_left_outer,
+				lower_left_inner,
+				upper_left_inner,
+			}
+			bottom: [4]renderer.Point = {
+				lower_left_inner,
+				lower_left_outer,
+				lower_right_outer,
+				lower_right_inner,
+			}
+			right: [4]renderer.Point = {
+				upper_right_inner,
+				lower_right_inner,
+				lower_right_outer,
+				upper_right_outer,
+			}
+
+			make_quad(tris[:], state.cursor.left.x, tri_offset, upper, white, camera)
+			make_quad(tris[:], state.cursor.left.x, tri_offset + 2, left, white, camera)
+			make_quad(tris[:], state.cursor.left.x, tri_offset + 4, bottom, white, camera)
+			make_quad(tris[:], state.cursor.left.x, tri_offset + 6, right, white, camera)
 		}
 
 		// { 	// draw board cursor
@@ -216,13 +277,13 @@ main :: proc() {
 		// 	color := Color{255, 255, 255, 255}
 		// 	SDL.SetTextureColorMod(textures_atlas, color.r, color.g, color.b)
 		// 	SDL.RenderCopy(
-		// 		state.grpahics_ctx.sdl_renderer,
+		// 		state.graphics_ctx.sdl_renderer,
 		// 		textures_atlas,
 		// 		&src_rect,
 		// 		&dest_rect_left,
 		// 	)
 		// 	SDL.RenderCopyEx(
-		// 		state.grpahics_ctx.sdl_renderer,
+		// 		state.graphics_ctx.sdl_renderer,
 		// 		textures_atlas,
 		// 		&src_rect,
 		// 		&dest_rect_right,
@@ -234,9 +295,9 @@ main :: proc() {
 
 		// // END update and render
 
-		// renderer.draw_scene(state.grpahics_ctx)
+		// renderer.draw_scene(state.graphics_ctx)
 
-		renderer.render(state.grpahics_ctx, state.os_graphics_ctx, tris[:], {0, 0, 0, 1})
+		renderer.render(state.graphics_ctx, state.os_graphics_ctx, tris[:], {0, 0, 0, 1})
 	}
 
 	delete(keys_down)
@@ -269,7 +330,7 @@ WINDOW_FLAGS :: SDL.WINDOW_SHOWN | SDL.WINDOW_RESIZABLE
 // State
 
 State :: struct {
-	grpahics_ctx:    ^renderer.GraphicsContext,
+	graphics_ctx:    ^renderer.GraphicsContext,
 	os_graphics_ctx: ^renderer.OsGrpahicsContext,
 
 	//
@@ -339,10 +400,10 @@ state := State {
 handle_events :: proc(event: ^SDL.Event) {
 
 	if event.type == SDL.EventType.WINDOWEVENT {
-		if (event.window.windowID == SDL.GetWindowID(state.grpahics_ctx.window)) {
+		if (event.window.windowID == SDL.GetWindowID(state.graphics_ctx.window)) {
 			if event.window.event == SDL.WindowEventID.RESIZED {
-				state.grpahics_ctx.window_w = event.window.data1
-				state.grpahics_ctx.window_h = event.window.data2
+				state.graphics_ctx.window_w = event.window.data1
+				state.graphics_ctx.window_h = event.window.data2
 			}
 		}
 	}

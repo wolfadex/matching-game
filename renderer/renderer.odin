@@ -32,8 +32,6 @@ WINDOW_FLAGS :: SDL.WINDOW_SHOWN | SDL.WINDOW_RESIZABLE
 
 
 init :: proc(width: i32 = 1024, height: i32 = 960, font_size: i32 = 28) -> (ctx: GraphicsContext) {
-	// set_env()
-
 	ctx.window_w = width
 	ctx.window_h = height
 	ctx.font_size = font_size
