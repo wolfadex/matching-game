@@ -22,6 +22,20 @@ import SDL_TTF "vendor:sdl2/ttf"
 
 import "./renderer"
 
+CELL_SIZE :: 2
+BOARD_WIDTH :: 20 // columns, aka sides of the "circle"
+BOARD_HEIGHT :: 15 // rows
+ROTATION_DEG :: f32(360 / BOARD_WIDTH)
+THETA :: ROTATION_DEG / 2
+ROTATION_TIME :: 50 // ms
+
+RADIUS :=
+	f32(CELL_SIZE) /
+	2 *
+	linalg.sin(linalg.to_radians(90 - THETA)) /
+	linalg.sin(linalg.to_radians(THETA))
+
+
 main :: proc() {
 	when ODIN_DEBUG {
 		// setup debug logging
@@ -49,7 +63,7 @@ main :: proc() {
 
 		defer reset_tracking_allocator(&tracking_allocator)
 	}
-
+	log.debug(RADIUS)
 	ctx := renderer.init()
 	state.graphics_ctx = &ctx
 	defer renderer.cleanup(state.graphics_ctx)
@@ -132,12 +146,9 @@ main :: proc() {
 			color: renderer.Color,
 			camera: linalg.Matrix4f32,
 		) {
-			//        +------+
-			//       /|     /|
-			//   p0 +-+----+ | p3
-			//      | |    | |
-			//      | +----+-+
-			//      |/     |/
+			//   p0 +------+ p3
+			//      |      |
+			//      |      |
 			//   p1 +------+ p2
 			cam_pts: [4]renderer.Point
 
@@ -165,23 +176,75 @@ main :: proc() {
 			y_bottom := f32(point.y * CELL_SIZE)
 			y_top := y_bottom + CELL_SIZE
 
-			p1: renderer.Point = {x_left, y_top, RADIUS, 1}
-			p2: renderer.Point = {x_left, y_bottom, RADIUS, 1}
-			p3: renderer.Point = {x_right, y_bottom, RADIUS, 1}
-			p4: renderer.Point = {x_right, y_top, RADIUS, 1}
+			cursor_left_idx := point_to_index(state.cursor.left)
+			cursor_right_idx := point_to_index(state.cursor.right)
 
-			corners: [4]renderer.Point = {p1, p2, p3, p4}
+			local_radius :=
+				idx == cursor_left_idx || idx == cursor_right_idx ? RADIUS * 1.1 : RADIUS
+
+			//     p7 +------+ p4
+			//       /|     /|
+			//   p0 +-+----+ | p3
+			//      | |p6  | |
+			//      | +----+-+ p5
+			//      |/     |/
+			//   p1 +------+ p2
+			p0: renderer.Point = {x_left, y_top, local_radius, 1}
+			p1: renderer.Point = {x_left, y_bottom, local_radius, 1}
+			p2: renderer.Point = {x_right, y_bottom, local_radius, 1}
+			p3: renderer.Point = {x_right, y_top, local_radius, 1}
+			p4: renderer.Point = {x_right, y_top, local_radius - CELL_SIZE, 1}
+			p5: renderer.Point = {x_right, y_bottom, local_radius - CELL_SIZE, 1}
+			p6: renderer.Point = {x_left, y_bottom, local_radius - CELL_SIZE, 1}
+			p7: renderer.Point = {x_left, y_top, local_radius - CELL_SIZE, 1}
+
+			// FRONT
+			quad_1: [4]renderer.Point = {p0, p1, p2, p3}
+			// TOP
+			// quad_2: [4]renderer.Point = {p7, p0, p3, p4}
+			// BOTTOM
+			// quad_3: [4]renderer.Point = {p1, p6, p5, p2}
+			// LEFT
+			// quad_4: [4]renderer.Point = {p7, p6, p1, p0}
+			// RIGHT
+			// quad_5: [4]renderer.Point = {p3, p2, p5, p4}
+			// BACK
+			// quad_6: [4]renderer.Point = {p4, p5, p6, p7}
 
 			rot_deg := f32(point.x * (360 / BOARD_WIDTH))
 			rot_mat := linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
 
-			for pt, idx in corners {
-				corners[idx] = pt * rot_mat
+			for pt, idx in quad_1 {
+				quad_1[idx] = pt * rot_mat
 			}
+			// for pt, idx in quad_2 {
+			// 	quad_2[idx] = pt * rot_mat
+			// }
+			// for pt, idx in quad_3 {
+			//             quad_3[idx] = pt * rot_mat
+			// }
+			// for pt, idx in quad_4 {
+			// 	quad_4[idx] = pt * rot_mat
+			// }
+			// for pt, idx in quad_5 {
+			// 	quad_5[idx] = pt * rot_mat
+			// }
+			// for pt, idx in quad_6 {
+			// 	quad_6[idx] = pt * rot_mat
+			// }
 
-			make_quad(tris[:], point.x, tri_offset, corners, color, camera)
-
+			make_quad(tris[:], point.x, tri_offset, quad_1, color, camera)
 			tri_offset += 2
+			// make_quad(tris[:], point.x, tri_offset, quad_2, color, camera)
+			// tri_offset += 2
+			// make_quad(tris[:], point.x, tri_offset, quad_3, color, camera)
+			// tri_offset += 2
+			// make_quad(tris[:], point.x, tri_offset, quad_4, color, camera)
+			// tri_offset += 2
+			// make_quad(tris[:], point.x, tri_offset, quad_5, color, camera)
+			// tri_offset += 2
+			// make_quad(tris[:], point.x, tri_offset, quad_6, color, camera)
+			// tri_offset += 2
 		}
 
 		{ 	// DRAW CURSOR
@@ -303,13 +366,6 @@ main :: proc() {
 
 	delete(keys_down)
 }
-
-CELL_SIZE :: 2
-BOARD_WIDTH :: 20
-BOARD_HEIGHT :: 15
-RADIUS :: 8
-ROTATION_DEG :: f32(360 / BOARD_WIDTH)
-ROTATION_TIME :: 50 // ms
 
 Point2d :: distinct [2]int
 
