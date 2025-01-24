@@ -173,9 +173,10 @@ main :: proc() {
 			corners: [4]renderer.Point = {p1, p2, p3, p4}
 
 			rot_deg := f32(point.x * (360 / BOARD_WIDTH))
+			rot_mat := linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
+
 			for pt, idx in corners {
-				corners[idx] =
-					pt * linalg.matrix4_rotate_f32(linalg.to_radians(rot_deg), {0, 1, 0})
+				corners[idx] = pt * rot_mat
 			}
 
 			make_quad(tris[:], point.x, tri_offset, corners, color, camera)
@@ -184,7 +185,7 @@ main :: proc() {
 		}
 
 		{ 	// DRAW CURSOR
-			x_left: f32 = CELL_SIZE / -2 - CELL_SIZE
+			x_left: f32 = CELL_SIZE / -2
 			x_right: f32 = CELL_SIZE / 2
 			y_bottom_right := f32(state.cursor.left.y * CELL_SIZE)
 			y_top_right := y_bottom_right + CELL_SIZE
@@ -230,28 +231,28 @@ main :: proc() {
 			white: renderer.Color = {1, 1, 1, 1}
 
 			upper: [4]renderer.Point = {
-				upper_left_outer,
-				upper_left_inner,
-				upper_right_inner,
-				upper_right_outer,
+				upper_left_outer * rot_right_mat,
+				upper_left_inner * rot_right_mat,
+				upper_right_inner * rot_left_mat,
+				upper_right_outer * rot_left_mat,
 			}
 			left: [4]renderer.Point = {
-				upper_left_outer,
-				lower_left_outer,
-				lower_left_inner,
-				upper_left_inner,
+				upper_left_outer * rot_right_mat,
+				lower_left_outer * rot_right_mat,
+				lower_left_inner * rot_right_mat,
+				upper_left_inner * rot_right_mat,
 			}
 			bottom: [4]renderer.Point = {
-				lower_left_inner,
-				lower_left_outer,
-				lower_right_outer,
-				lower_right_inner,
+				lower_left_inner * rot_right_mat,
+				lower_left_outer * rot_right_mat,
+				lower_right_outer * rot_left_mat,
+				lower_right_inner * rot_left_mat,
 			}
 			right: [4]renderer.Point = {
-				upper_right_inner,
-				lower_right_inner,
-				lower_right_outer,
-				upper_right_outer,
+				upper_right_inner * rot_left_mat,
+				lower_right_inner * rot_left_mat,
+				lower_right_outer * rot_left_mat,
+				upper_right_outer * rot_left_mat,
 			}
 
 			make_quad(tris[:], state.cursor.left.x, tri_offset, upper, white, camera)
