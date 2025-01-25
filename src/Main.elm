@@ -473,13 +473,13 @@ swapAnimation origin destination =
                 origin
                     |> Frame3d.translateAlongOwn Frame3d.yAxis
                         (Length.meters (cellSize * 1.5))
-          , offset = 80
+          , offset = 30
           }
         , { frame =
                 destination
                     |> Frame3d.translateAlongOwn Frame3d.yAxis
                         (Length.meters (cellSize * 1.5))
-          , offset = 160
+          , offset = 210
           }
         , { frame = destination
           , offset = 240
