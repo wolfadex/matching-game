@@ -1,10 +1,5 @@
 module Animation exposing (..)
 
-import Direction3d
-import Frame3d exposing (Frame3d)
-import Point3d
-import Vector3d
-
 
 type alias Animation a =
     { state : State a
