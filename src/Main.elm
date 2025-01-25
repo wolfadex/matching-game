@@ -4,18 +4,18 @@ import Angle exposing (Angle)
 import Animation exposing (Animation)
 import Array exposing (Array)
 import Array.Extra
-import Axis3d
+import Axis3d exposing (Axis3d)
 import Block3d
 import Browser
 import Browser.Events
 import Camera3d
 import Color exposing (Color)
-import Direction3d
+import Direction3d exposing (Direction3d)
 import Frame3d exposing (Frame3d)
 import Html
 import Html.Attributes
 import Json.Decode
-import Length
+import Length exposing (Length)
 import Pixels
 import Point3d
 import Quantity
@@ -24,7 +24,7 @@ import Random.List
 import Scene3d
 import Scene3d.Material
 import Util.Maybe
-import Vector3d
+import Vector3d exposing (Vector3d)
 import Viewpoint3d
 
 
@@ -424,14 +424,67 @@ update msg model =
                         rightCell =
                             Array.get rightIdx model.board
                     in
-                    ( { model
-                        | board =
-                            model.board
-                                |> Util.Maybe.apply (Array.set leftIdx) rightCell
-                                |> Util.Maybe.apply (Array.set rightIdx) leftCell
-                      }
-                    , Cmd.none
-                    )
+                    case ( leftCell, rightCell ) of
+                        ( Just left, Just right ) ->
+                            ( { model
+                                | board =
+                                    model.board
+                                        |> Array.set leftIdx
+                                            { right
+                                                | animation =
+                                                    swapAnimation
+                                                        (Frame3d.atOrigin
+                                                            |> Frame3d.translateBy (Vector3d.meters 0 radius 0)
+                                                            |> Frame3d.rotateAround Axis3d.z (Angle.degrees rotationDeg)
+                                                            |> Frame3d.translateBy (Vector3d.meters 0 -radius 0)
+                                                        )
+                                                        (Frame3d.atOrigin
+                                                            |> Frame3d.translateBy (Vector3d.meters 0 (cellSize * 0.4) 0)
+                                                        )
+                                            }
+                                        |> Array.set rightIdx
+                                            { left
+                                                | animation =
+                                                    swapAnimation
+                                                        (Frame3d.atOrigin
+                                                            |> Frame3d.translateBy (Vector3d.meters 0 radius 0)
+                                                            |> Frame3d.rotateAround Axis3d.z (Angle.degrees -rotationDeg)
+                                                            |> Frame3d.translateBy (Vector3d.meters 0 -radius 0)
+                                                        )
+                                                        (Frame3d.atOrigin
+                                                            |> Frame3d.translateBy (Vector3d.meters 0 (cellSize * 0.4) 0)
+                                                        )
+                                            }
+                              }
+                            , Cmd.none
+                            )
+
+                        _ ->
+                            ( model, Cmd.none )
+
+
+swapAnimation : Frame3d Length.Meters World Local -> Frame3d Length.Meters World Local -> Animation (Frame3d Length.Meters World Local)
+swapAnimation origin destination =
+    Animation.animation
+        [ { frame = origin
+          , offset = 0
+          }
+        , { frame =
+                origin
+                    |> Frame3d.translateAlongOwn Frame3d.yAxis
+                        (Length.meters (cellSize * 1.5))
+          , offset = 80
+          }
+        , { frame =
+                destination
+                    |> Frame3d.translateAlongOwn Frame3d.yAxis
+                        (Length.meters (cellSize * 1.5))
+          , offset = 160
+          }
+        , { frame = destination
+          , offset = 240
+          }
+        ]
 
 
 changeFocus : { old : Cursor, new : Cursor } -> Board -> Board
