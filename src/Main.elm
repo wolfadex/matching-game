@@ -280,6 +280,7 @@ update msg model =
                             }
                         )
                         model.board
+                        |> dropCells
                 , rotation =
                     let
                         ( defaultRot, anim ) =
@@ -501,6 +502,50 @@ update msg model =
 
                         _ ->
                             ( model, Cmd.none )
+
+
+dropCells : Board -> Board
+dropCells board =
+    List.foldl
+        (\x brd ->
+            List.foldl
+                (\y ( b, dropTo ) ->
+                    let
+                        idx =
+                            pointToIndex ( x, y )
+                    in
+                    case dropTo of
+                        Nothing ->
+                            case Array.get idx board of
+                                Nothing ->
+                                    ( b, dropTo )
+
+                                Just cell ->
+                                    if cell.symbol == None then
+                                        ( b, Just ( cell, idx ) )
+
+                                    else
+                                        ( b, dropTo )
+
+                        Just ( cellToPushUp, idxToPushUp ) ->
+                            case Array.get idx board of
+                                Nothing ->
+                                    ( b, Nothing )
+
+                                Just cell ->
+                                    ( b
+                                        -- TODO: animate down
+                                        |> Array.set idxToPushUp cell
+                                        |> Array.set idx cellToPushUp
+                                    , Just ( cellToPushUp, idx )
+                                    )
+                )
+                ( brd, Nothing )
+                (List.range 0 (boardHeight - 1))
+                |> Tuple.first
+        )
+        board
+        (List.range 0 (boardWidth - 1))
 
 
 scoreMatch : Set Point2d -> Board -> ( Board, Int )
