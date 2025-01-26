@@ -23,6 +23,8 @@ import Random
 import Random.List
 import Scene3d
 import Scene3d.Material
+import Set exposing (Set)
+import Util.Bool
 import Util.Maybe
 import Vector3d exposing (Vector3d)
 import Viewpoint3d
@@ -45,6 +47,7 @@ type alias Model =
     , rotation : ( Angle, Animation Angle )
     , windowWidth : Int
     , windowHeight : Int
+    , score : Int
     }
 
 
@@ -104,6 +107,7 @@ type Symbol
     | B
     | C
     | D
+    | None
 
 
 interpolateFrame3d : Frame3d Length.Meters World Local -> Frame3d Length.Meters World Local -> Float -> Frame3d Length.Meters World Local
@@ -191,6 +195,7 @@ init { seedStarter, windowWidth, windowHeight } =
       , rotation = ( Angle.degrees (rotationDeg / 2), Animation.animation [] )
       , windowWidth = windowWidth
       , windowHeight = windowHeight
+      , score = 0
       }
     , Cmd.none
     )
@@ -429,8 +434,8 @@ update msg model =
                     in
                     case ( leftCell, rightCell ) of
                         ( Just left, Just right ) ->
-                            ( { model
-                                | board =
+                            let
+                                swappedBoard =
                                     model.board
                                         |> Array.set leftIdx
                                             { right
@@ -458,12 +463,171 @@ update msg model =
                                                             |> Frame3d.translateBy (Vector3d.meters 0 (cellSize * 0.4) 0)
                                                         )
                                             }
-                              }
-                            , Cmd.none
-                            )
+                            in
+                            if left.symbol == right.symbol then
+                                ( { model | board = swappedBoard }
+                                , Cmd.none
+                                )
+
+                            else
+                                let
+                                    ( leftMatches, rightMatches ) =
+                                        findMatches model.cursor swappedBoard
+
+                                    ( scoredBoard, newScore ) =
+                                        ( swappedBoard, model.score )
+                                            |> Util.Bool.apply
+                                                (\( b, s ) ->
+                                                    scoreMatch leftMatches b
+                                                        |> Tuple.mapSecond ((+) s)
+                                                )
+                                                (Set.size leftMatches >= 3)
+                                            |> Util.Bool.apply
+                                                (\( b, s ) ->
+                                                    scoreMatch rightMatches b
+                                                        |> Tuple.mapSecond ((+) s)
+                                                )
+                                                (Set.size rightMatches >= 3)
+                                in
+                                ( { model
+                                    | board = scoredBoard
+                                    , score = newScore
+                                  }
+                                , Cmd.none
+                                )
 
                         _ ->
                             ( model, Cmd.none )
+
+
+scoreMatch : Set Point2d -> Board -> ( Board, Int )
+scoreMatch cellsToScore board =
+    ( Set.foldl
+        (\point ->
+            Array.Extra.update (pointToIndex point)
+                (\cell ->
+                    { cell | symbol = None }
+                )
+        )
+        board
+        cellsToScore
+    , Set.size cellsToScore
+    )
+
+
+findMatches : Cursor -> Board -> ( Set Point2d, Set Point2d )
+findMatches cursor board =
+    let
+        leftIdx =
+            pointToIndex cursor.left
+
+        rightIdx =
+            pointToIndex cursor.right
+
+        leftCell =
+            Array.get leftIdx board
+
+        rightCell =
+            Array.get rightIdx board
+    in
+    case ( leftCell, rightCell ) of
+        ( Just left, Just right ) ->
+            if left.symbol == right.symbol then
+                ( Set.empty, Set.empty )
+
+            else
+                ( gatherCells left.symbol cursor.left board
+                , gatherCells right.symbol cursor.right board
+                )
+
+        _ ->
+            ( Set.empty, Set.empty )
+
+
+gatherCells : Symbol -> Point2d -> Board -> Set Point2d
+gatherCells originSymbol startPoint board =
+    case originSymbol of
+        None ->
+            Set.empty
+
+        _ ->
+            gatherCellsHelper originSymbol (Set.singleton startPoint) board (Set.singleton startPoint) Set.empty
+
+
+gatherCellsHelper : Symbol -> Set Point2d -> Board -> Set Point2d -> Set Point2d -> Set Point2d
+gatherCellsHelper originSymbol nextSearches board gatheredPoints excludedPoints =
+    case Set.toList nextSearches of
+        [] ->
+            gatheredPoints
+
+        ( x, y ) :: restSearches ->
+            let
+                pointAbove =
+                    ( x, y + 1 )
+
+                pointBelow =
+                    ( x, y - 1 )
+
+                pointRight =
+                    ( x + 1, y )
+
+                pointLeft =
+                    ( x - 1, y )
+
+                nextNeighbors =
+                    [ pointAbove
+                    , pointBelow
+                    , pointRight
+                    , pointLeft
+                    ]
+                        |> List.filterMap
+                            (\point ->
+                                if Set.member point gatheredPoints then
+                                    Nothing
+
+                                else if Set.member point excludedPoints then
+                                    Nothing
+
+                                else
+                                    case Array.get (pointToIndex point) board of
+                                        Nothing ->
+                                            Nothing
+
+                                        Just cell ->
+                                            Just
+                                                (if cell.symbol == originSymbol then
+                                                    Matches point
+
+                                                 else
+                                                    Differs point
+                                                )
+                            )
+            in
+            case nextNeighbors of
+                [] ->
+                    gatherCellsHelper originSymbol (Set.fromList restSearches) board gatheredPoints excludedPoints
+
+                neighbors ->
+                    let
+                        ( gathered, excluded ) =
+                            List.foldl
+                                (\neighbor ( g, e ) ->
+                                    case neighbor of
+                                        Matches a ->
+                                            ( Set.insert a g, e )
+
+                                        Differs a ->
+                                            ( g, Set.insert a e )
+                                )
+                                ( gatheredPoints, excludedPoints )
+                                neighbors
+                    in
+                    gatherCellsHelper originSymbol (Set.fromList restSearches) board gathered excluded
+
+
+type MatchingNeighbor a
+    = Matches a
+    | Differs a
 
 
 swapAnimation : Frame3d Length.Meters World Local -> Frame3d Length.Meters World Local -> Animation (Frame3d Length.Meters World Local)
@@ -590,7 +754,11 @@ view : Model -> Browser.Document Msg
 view model =
     { title = "Matching Game"
     , body =
-        [ Html.div
+        [ Html.h3 []
+            [ Html.text "Score:"
+            , Html.text (String.fromInt model.score)
+            ]
+        , Html.div
             [ Html.Attributes.style "border" "1px solid black"
             ]
             [ let
@@ -677,23 +845,28 @@ viewCell rotation cursor index cell =
                 cell.animation
     in
     List.filterMap identity
-        [ Just
-            (Scene3d.block
-                (Scene3d.Material.matte (symbolToColor cell.symbol))
-                (Block3d.centeredOn frame
-                    ( Length.meters cellSize
-                    , Length.meters cellSize
-                    , Length.meters cellSize
-                    )
-                    |> Block3d.translateBy
-                        (Vector3d.meters 0 radius (toFloat y))
-                    |> Block3d.rotateAround
-                        Axis3d.z
-                        (Angle.degrees (rotationDeg * toFloat x)
-                            |> Quantity.minus rotation
+        [ case symbolToColor cell.symbol of
+            Just color ->
+                Just
+                    (Scene3d.block
+                        (Scene3d.Material.matte color)
+                        (Block3d.centeredOn frame
+                            ( Length.meters cellSize
+                            , Length.meters cellSize
+                            , Length.meters cellSize
+                            )
+                            |> Block3d.translateBy
+                                (Vector3d.meters 0 radius (toFloat y))
+                            |> Block3d.rotateAround
+                                Axis3d.z
+                                (Angle.degrees (rotationDeg * toFloat x)
+                                    |> Quantity.minus rotation
+                                )
                         )
-                )
-            )
+                    )
+
+            Nothing ->
+                Nothing
         , if isFocused then
             let
                 size =
@@ -728,17 +901,20 @@ viewCell rotation cursor index cell =
         ]
 
 
-symbolToColor : Symbol -> Color
+symbolToColor : Symbol -> Maybe Color
 symbolToColor symbol =
     case symbol of
         A ->
-            Color.rgba 1 0 0 1
+            Just (Color.rgba 1 0 0 1)
 
         B ->
-            Color.rgba 0 1 0 1
+            Just (Color.rgba 0 1 0 1)
 
         C ->
-            Color.rgba 0 0 1 1
+            Just (Color.rgba 0 0 1 1)
 
         D ->
-            Color.rgba 0.5 0 0.5 1
+            Just (Color.rgba 0.5 0 0.5 1)
+
+        None ->
+            Nothing
