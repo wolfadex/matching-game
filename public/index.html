@@ -6,12 +6,24 @@
     <body>
         <script src="elm.js"></script>
         <script>
-            Elm.Main.init({
+            const rotateSound = new Audio(
+                "assets/stoneblockdragwoodgrind-82327.mp3",
+            );
+
+            const app = Elm.Main.init({
                 flags: {
                     seedStarter: Date.now(),
                     windowWidth: window.screen.width,
                     windowHeight: window.screen.height,
                 },
+            });
+
+            app.ports.playSound.subscribe(function (sound) {
+                switch (sound) {
+                    case "ROTATE":
+                        rotateSound.play();
+                        break;
+                }
             });
         </script>
     </body>

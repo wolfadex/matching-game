@@ -1,4 +1,4 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import Angle exposing (Angle)
 import Animation exposing (Animation)
@@ -202,14 +202,6 @@ type Msg
     | WindowResized Int Int
 
 
-type Input
-    = RotateRight
-    | RotateLeft
-    | MoveUp
-    | MoveDown
-    | Swap
-
-
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
@@ -243,6 +235,17 @@ keyDownDecoder =
                     _ ->
                         Json.Decode.fail "Not recognized input"
             )
+
+
+port playSound : String -> Cmd msg
+
+
+type Input
+    = RotateRight
+    | RotateLeft
+    | MoveUp
+    | MoveDown
+    | Swap
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -366,7 +369,7 @@ update msg model =
                                 ]
                             )
                       }
-                    , Cmd.none
+                    , playSound "ROTATE"
                     )
 
                 RotateRight ->
@@ -407,7 +410,7 @@ update msg model =
                                 ]
                             )
                       }
-                    , Cmd.none
+                    , playSound "ROTATE"
                     )
 
                 Swap ->
