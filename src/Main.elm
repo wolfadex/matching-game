@@ -7,6 +7,7 @@ import Array.Extra
 import Axis3d exposing (Axis3d)
 import Block3d
 import Browser
+import Browser.Dom
 import Browser.Events
 import Camera3d
 import Color exposing (Color)
@@ -24,6 +25,7 @@ import Random.List
 import Scene3d
 import Scene3d.Material
 import Set exposing (Set)
+import Task
 import Util.Bool
 import Util.Maybe
 import Vector3d exposing (Vector3d)
@@ -193,11 +195,12 @@ init { seedStarter, windowWidth, windowHeight } =
       , board = changeFocus { old = cursor, new = cursor } initialBoard
       , cursor = cursor
       , rotation = ( Angle.degrees (rotationDeg / 2), Animation.animation [] )
-      , windowWidth = windowWidth
-      , windowHeight = windowHeight
+      , windowWidth = 0
+      , windowHeight = 0
       , score = 0
       }
-    , Cmd.none
+    , Browser.Dom.getViewport
+        |> Task.perform (\{ viewport } -> WindowResized (round viewport.width) (round viewport.height))
     )
 
 
@@ -511,7 +514,7 @@ scoreMatch cellsToScore board =
         )
         board
         cellsToScore
-    , Set.size cellsToScore
+    , Set.size cellsToScore ^ 2
     )
 
 
@@ -569,10 +572,22 @@ gatherCellsHelper originSymbol nextSearches board gatheredPoints excludedPoints 
                     ( x, y - 1 )
 
                 pointRight =
-                    ( x + 1, y )
+                    ( if x + 1 == boardWidth then
+                        0
+
+                      else
+                        x + 1
+                    , y
+                    )
 
                 pointLeft =
-                    ( x - 1, y )
+                    ( if x - 1 < 0 then
+                        boardWidth - 1
+
+                      else
+                        x - 1
+                    , y
+                    )
 
                 nextNeighbors =
                     [ pointAbove
@@ -609,20 +624,20 @@ gatherCellsHelper originSymbol nextSearches board gatheredPoints excludedPoints 
 
                 neighbors ->
                     let
-                        ( gathered, excluded ) =
+                        ( rest, gathered, excluded ) =
                             List.foldl
-                                (\neighbor ( g, e ) ->
+                                (\neighbor ( r, g, e ) ->
                                     case neighbor of
                                         Matches a ->
-                                            ( Set.insert a g, e )
+                                            ( r ++ [ a ], Set.insert a g, e )
 
                                         Differs a ->
-                                            ( g, Set.insert a e )
+                                            ( r, g, Set.insert a e )
                                 )
-                                ( gatheredPoints, excludedPoints )
+                                ( restSearches, gatheredPoints, excludedPoints )
                                 neighbors
                     in
-                    gatherCellsHelper originSymbol (Set.fromList restSearches) board gathered excluded
+                    gatherCellsHelper originSymbol (Set.fromList rest) board gathered excluded
 
 
 type MatchingNeighbor a
